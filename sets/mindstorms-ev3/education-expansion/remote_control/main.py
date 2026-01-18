@@ -2,7 +2,7 @@ from pybricks.hubs import EV3Brick
 from pybricks.parameters import Color, Port, Stop, Direction
 from pybricks.ev3devices import Motor
 from pybricks.tools import wait, StopWatch, run_task
-from pybricks.messaging import rfcomm_connect
+from pybricks.messaging import RFCOMMSocket
 from micropython import const
 from umath import sin, pi
 import ustruct
@@ -108,11 +108,11 @@ UPDATE_PERIOD = const(16)  # ms
 
 async def main():
     """Main remote control process."""
+    sock = RFCOMMSocket()
     while True:
         hub.light.on(Color.RED)
-        conn = None
         try: 
-            conn = await rfcomm_connect(TARGET_BLUETOOTH_ADDRESS)
+            await sock.connect(TARGET_BLUETOOTH_ADDRESS)
             hub.light.on(Color.GREEN)
             stopwatch = StopWatch()
             update = StopWatch()
@@ -130,13 +130,13 @@ async def main():
                     continue
                     
                 ustruct.pack_into('>bb', msg_buf, 0, wheel, throttle_value)
-                conn.write(msg_buf)
+                sock.write(msg_buf)
                 update.reset()
                 
                 print(f"AXIS1:{wheel} AXIS2:{throttle_value}")
                 await wait(1)
         finally:
-            if conn:
-                conn.close()
+            if sock:
+                sock.close()
 
 run_task(main())

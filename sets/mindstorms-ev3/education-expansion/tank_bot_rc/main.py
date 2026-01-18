@@ -16,7 +16,7 @@ from pybricks.ev3devices import Motor, GyroSensor
 from pybricks.parameters import Port, Direction, Button, Color
 from pybricks.tools import StopWatch, wait, run_task
 from pybricks.robotics import DriveBase
-from pybricks.messaging import rfcomm_listen, local_address 
+from pybricks.messaging import RFCOMMSocket, local_address 
 
 from micropython import const
 
@@ -54,34 +54,34 @@ msg_buf_view = memoryview(msg_buf)
 cur_idx = 0
 
 async def main():
-    while True:
-        print('Local address: ', local_address())
-        ev3.light.on(Color.RED)
-        print('Waiting for connection...')
-        conn = await rfcomm_listen()
-        print('Connected!')
-        ev3.light.on(Color.GREEN)
+    sock = RFCOMMSocket()
+    print('Local address: ', local_address())
+    ev3.light.on(Color.RED)
+    print('Waiting for connection...')
+    await sock.listen()
+    print('Connected!')
+    ev3.light.on(Color.GREEN)
 
-        timeout = StopWatch()
+    timeout = StopWatch()
+    cur_idx = 0
+    while timeout.time() < 100:
+        cur_idx += sock.readinto(msg_buf_view[cur_idx:], len(msg_buf) - cur_idx)
+
+        if cur_idx != len(msg_buf):
+            # We were not able to read the entire message. Loop again.
+            await wait(1)
+            continue
+
+        timeout.reset()
+        axis1, axis2 = ustruct.unpack('>bb', msg_buf)
         cur_idx = 0
-        while timeout.time() < 100:
-            cur_idx += conn.readinto(msg_buf_view[cur_idx:], len(msg_buf) - cur_idx)
 
-            if cur_idx != len(msg_buf):
-                # We were not able to read the entire message. Loop again.
-                await wait(1)
-                continue
+        speed = axis2 * SPEED_SCALE  # -768 to +768 mm/s
+        turn_rate = axis1 * TURN_SCALE  # -320 to +320 deg/s
+        robot.drive(speed, turn_rate)
 
-            timeout.reset()
-            axis1, axis2 = ustruct.unpack('>bb', msg_buf)
-            cur_idx = 0
-
-            speed = axis2 * SPEED_SCALE  # -768 to +768 mm/s
-            turn_rate = axis1 * TURN_SCALE  # -320 to +320 deg/s
-            robot.drive(speed, turn_rate)
-
-        robot.stop()
-        print('Client disconnected or timed out.')
-        conn.close()
+    robot.stop()
+    print('Client disconnected or timed out.')
+    sock.close()
 
 run_task(main())
