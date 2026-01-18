@@ -108,10 +108,9 @@ UPDATE_PERIOD = const(16)  # ms
 
 async def main():
     """Main remote control process."""
-    sock = RFCOMMSocket()
-    while True:
-        hub.light.on(Color.RED)
-        try: 
+    with RFCOMMSocket() as sock:
+        while True:
+            hub.light.on(Color.RED)
             await sock.connect(TARGET_BLUETOOTH_ADDRESS)
             hub.light.on(Color.GREEN)
             stopwatch = StopWatch()
@@ -127,6 +126,7 @@ async def main():
                     # higher rate than we send out updates, because
                     # their motors need to be adjusted more frequently
                     # than our RC device needs to receive updates.
+                    await wait(1)
                     continue
                     
                 ustruct.pack_into('>bb', msg_buf, 0, wheel, throttle_value)
@@ -135,8 +135,5 @@ async def main():
                 
                 print(f"AXIS1:{wheel} AXIS2:{throttle_value}")
                 await wait(1)
-        finally:
-            if sock:
-                sock.close()
 
 run_task(main())
