@@ -115,7 +115,7 @@ async def main():
             hub.light.on(Color.GREEN)
             stopwatch = StopWatch()
             update = StopWatch()
-            msg_buf = bytearray(2)
+            
             while True:
                 t = stopwatch.time()
                 wheel = steering_wheel(t)
@@ -129,8 +129,7 @@ async def main():
                     await wait(1)
                     continue
                     
-                ustruct.pack_into('>bb', msg_buf, 0, wheel, throttle_value)
-                sock.write(msg_buf)
+                await sock.write(ustruct.pack('>bb', wheel, throttle_value))
                 update.reset()
                 
                 print(f"AXIS1:{wheel} AXIS2:{throttle_value}")

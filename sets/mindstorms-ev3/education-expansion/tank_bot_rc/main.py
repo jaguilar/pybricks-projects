@@ -14,9 +14,9 @@ https://education.lego.com/en-us/support/mindstorms-ev3/building-instructions#bu
 from pybricks.hubs import EV3Brick
 from pybricks.ev3devices import Motor, GyroSensor
 from pybricks.parameters import Port, Direction, Button, Color
-from pybricks.tools import StopWatch, wait, run_task
+from pybricks.tools import StopWatch, wait, run_task, multitask
 from pybricks.robotics import DriveBase
-from pybricks.messaging import RFCOMMSocket, local_address 
+from pybricks.messaging import RFCOMMSocket, local_address
 
 from micropython import const
 
@@ -46,13 +46,6 @@ robot = DriveBase(left_motor, right_motor, WHEEL_DIAMETER, AXLE_TRACK)
 SPEED_SCALE = 6  # Scale factor for speed (768 // 127)
 TURN_SCALE = 2  # Scale factor for turn rate (320 // 127)
 
-# Storage for incoming messages from remote control.
-msg_buf = bytearray(2)    
-msg_buf_view = memoryview(msg_buf)
-
-# Tracks the next-to-be-filled index in msg_buf.
-cur_idx = 0
-
 async def main():
     sock = RFCOMMSocket()
     print('Local address: ', local_address())
@@ -62,19 +55,14 @@ async def main():
     print('Connected!')
     ev3.light.on(Color.GREEN)
 
-    timeout = StopWatch()
-    cur_idx = 0
-    while timeout.time() < 100:
-        cur_idx += sock.readinto(msg_buf_view[cur_idx:], len(msg_buf) - cur_idx)
+    while True:
+        (msg, _) = await multitask(sock.read(2), wait(100), race=True)
 
-        if cur_idx != len(msg_buf):
-            # We were not able to read the entire message. Loop again.
-            await wait(1)
-            continue
+        if msg is None:
+            # Connection timed out.
+            break
 
-        timeout.reset()
-        axis1, axis2 = ustruct.unpack('>bb', msg_buf)
-        cur_idx = 0
+        axis1, axis2 = ustruct.unpack('>bb', msg)
 
         speed = axis2 * SPEED_SCALE  # -768 to +768 mm/s
         turn_rate = axis1 * TURN_SCALE  # -320 to +320 deg/s
